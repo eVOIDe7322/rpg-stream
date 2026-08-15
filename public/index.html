@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <meta
+            name="description"
+            content="Biblioteca local de vídeos do RPGStream"
+        />
+        <title>RPGStream</title>
+        <link rel="stylesheet" href="/assets/styles/main.css" />
+        <script src="/vendor/hls.min.js"></script>
+        <script type="module" src="/app/bootstrap.js"></script>
+    </head>
+    <body>
+        <aside class="sidebar">
+            <a class="logo" href="/" aria-label="Página inicial">
+                <span class="logo__mark" aria-hidden="true">▶</span>
+                RPGStream
+            </a>
+
+            <div id="current-user" class="current-user"></div>
+
+            <section
+                class="sidebar__navigation"
+                aria-labelledby="navigation-title"
+            >
+                <h2 class="section-title" id="navigation-title">
+                    Navegação
+                </h2>
+                <nav
+                    id="category-list"
+                    class="category-list"
+                    aria-label="Categorias"
+                ></nav>
+            </section>
+
+            <section
+                class="category-manager"
+                aria-labelledby="category-manager-title"
+            >
+                <h2 class="section-title" id="category-manager-title">
+                    Gerenciar
+                </h2>
+                <form id="category-form">
+                    <label class="sr-only" for="new-category-name">
+                        Nova categoria
+                    </label>
+                    <input
+                        id="new-category-name"
+                        name="name"
+                        type="text"
+                        placeholder="Nova categoria..."
+                        autocomplete="off"
+                    />
+                    <button class="button button--compact" type="submit">
+                        Adicionar
+                    </button>
+                </form>
+            </section>
+        </aside>
+
+        <main class="main-content">
+            <section
+                id="player-wrapper"
+                class="player"
+                aria-labelledby="playing-title"
+                hidden
+            >
+                <video id="video-player" controls></video>
+                <div class="player__details">
+                    <h1 id="playing-title"></h1>
+                    <p id="playing-meta" class="muted"></p>
+                    <section class="markers" aria-labelledby="markers-title">
+                        <div class="markers__heading">
+                            <h2 id="markers-title">Marcadores</h2>
+                            <button
+                                id="marker-at-current-time"
+                                class="button button--secondary"
+                                type="button"
+                            >
+                                Marcar momento atual
+                            </button>
+                        </div>
+                        <form id="marker-form" class="marker-form">
+                            <input
+                                id="marker-title"
+                                type="text"
+                                maxlength="120"
+                                placeholder="Ex.: Início do combate"
+                                required
+                            />
+                            <input
+                                id="marker-time"
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                aria-label="Tempo em segundos"
+                                required
+                            />
+                            <button class="button" type="submit">Adicionar</button>
+                        </form>
+                        <div id="marker-list" class="marker-list"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section
+                id="upload-section"
+                class="upload-card"
+                aria-labelledby="upload-title"
+            >
+                <h2 class="section-title" id="upload-title">
+                    Enviar novo conteúdo
+                </h2>
+                <form id="upload-form" class="upload-form">
+                    <label class="field">
+                        <span>Título</span>
+                        <input
+                            id="upload-title-input"
+                            name="title"
+                            type="text"
+                            placeholder="Ex.: Sessão 01 — Introdução"
+                        />
+                    </label>
+
+                    <label class="field">
+                        <span>Categoria</span>
+                        <select
+                            id="upload-category"
+                            name="categoryId"
+                        ></select>
+                    </label>
+
+                    <label class="field">
+                        <span>Arquivo de vídeo</span>
+                        <input
+                            id="upload-file"
+                            name="video"
+                            type="file"
+                            accept="video/*"
+                            required
+                        />
+                    </label>
+
+                    <button
+                        id="upload-button"
+                        class="button"
+                        type="submit"
+                    >
+                        Upload
+                    </button>
+                </form>
+
+                <div
+                    id="upload-progress"
+                    class="progress"
+                    role="progressbar"
+                    aria-label="Progresso do upload"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                    hidden
+                >
+                    <div
+                        id="upload-progress-fill"
+                        class="progress__fill"
+                    ></div>
+                </div>
+                <p
+                    id="upload-status"
+                    class="upload-status muted"
+                    aria-live="polite"
+                ></p>
+            </section>
+
+            <section id="admin-panel" class="admin-panel" hidden>
+                <div class="admin-panel__heading">
+                    <div>
+                        <span class="admin-panel__eyebrow">Administração</span>
+                        <h2>Painel da biblioteca</h2>
+                    </div>
+                    <button
+                        id="admin-refresh"
+                        class="button button--secondary"
+                        type="button"
+                    >
+                        Atualizar painel
+                    </button>
+                </div>
+
+                <div class="admin-summary">
+                    <article><span>Armazenamento</span><strong id="admin-storage">—</strong></article>
+                    <article><span>Fila</span><strong id="admin-queue">—</strong></article>
+                    <article><span>Erros do FFmpeg</span><strong id="admin-errors">—</strong></article>
+                    <article><span>Lixeira</span><strong id="admin-trash-summary">—</strong></article>
+                </div>
+
+                <div class="admin-columns">
+                    <section class="admin-card">
+                        <h3>Espaço por categoria</h3>
+                        <div id="admin-category-storage" class="admin-list"></div>
+                    </section>
+                    <section class="admin-card">
+                        <h3>Vídeos maiores</h3>
+                        <div id="admin-largest-videos" class="admin-list"></div>
+                    </section>
+                </div>
+
+                <div class="admin-columns">
+                    <section class="admin-card">
+                        <h3>Backup e restauração</h3>
+                        <p class="muted">O backup inclui banco, capas, vídeos e lixeira.</p>
+                        <button id="admin-backup-button" class="button" type="button">
+                            Baixar backup completo
+                        </button>
+                        <form id="admin-restore-form" class="admin-form">
+                            <input name="backup" type="file" accept=".zip,application/zip" required />
+                            <button class="button button--secondary" type="submit">
+                                Preparar restauração
+                            </button>
+                        </form>
+                    </section>
+
+                    <section class="admin-card">
+                        <h3>Novo usuário</h3>
+                        <form id="admin-user-form" class="admin-form">
+                            <input name="nome" placeholder="Usuário" minlength="3" required />
+                            <input name="senha" type="password" placeholder="Senha (mín. 8)" minlength="8" required />
+                            <select name="papel">
+                                <option value="viewer">Viewer — somente leitura</option>
+                                <option value="editor">Editor — gerencia conteúdo</option>
+                                <option value="admin">Admin — acesso completo</option>
+                            </select>
+                            <button class="button" type="submit">Criar usuário</button>
+                        </form>
+                        <div id="admin-user-list" class="admin-list"></div>
+                    </section>
+                </div>
+
+                <section class="admin-card">
+                    <h3>Lixeira recuperável</h3>
+                    <div id="admin-trash-list" class="admin-list"></div>
+                </section>
+            </section>
+
+            <section aria-labelledby="video-grid-title">
+                <div class="library-heading">
+                    <h2 class="section-title" id="video-grid-title">
+                        Todos os vídeos
+                    </h2>
+                    <span id="video-count" class="library-count"></span>
+                </div>
+
+                <div class="library-toolbar" aria-label="Filtros da biblioteca">
+                    <label class="field library-toolbar__search">
+                        <span>Pesquisar</span>
+                        <input
+                            id="video-search"
+                            type="search"
+                            placeholder="Buscar por título..."
+                            autocomplete="off"
+                        />
+                    </label>
+
+                    <label class="field">
+                        <span>Situação</span>
+                        <select id="video-status-filter">
+                            <option value="todos">Todos</option>
+                            <option value="concluido">Prontos</option>
+                            <option value="processando">Processando</option>
+                            <option value="erro">Com erro</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span>Ordenar</span>
+                        <select id="video-sort">
+                            <option value="recentes">Mais recentes</option>
+                            <option value="titulo">Título</option>
+                            <option value="duracao">Duração</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span>Visualização</span>
+                        <select id="video-view-filter">
+                            <option value="todos">Todos</option>
+                            <option value="favoritos">Favoritos</option>
+                            <option value="nao_assistidos">Não assistidos</option>
+                        </select>
+                    </label>
+
+                    <div class="library-toolbar__actions">
+                        <button
+                            id="enable-notifications"
+                            class="button button--secondary"
+                            type="button"
+                        >
+                            Notificações
+                        </button>
+                        <button
+                            id="library-export"
+                            class="button button--secondary"
+                            type="button"
+                        >
+                            Exportar
+                        </button>
+                        <button
+                            id="video-refresh"
+                            class="button button--secondary"
+                            type="button"
+                        >
+                            Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="video-grid" class="video-grid"></div>
+                <p id="video-empty" class="empty-state" aria-live="polite" hidden>
+                    Nenhum vídeo encontrado.
+                </p>
+                <nav
+                    id="video-pagination"
+                    class="video-pagination"
+                    aria-label="Paginação dos vídeos"
+                    hidden
+                >
+                    <button
+                        id="video-previous-page"
+                        class="button button--secondary"
+                        type="button"
+                    >
+                        Anterior
+                    </button>
+                    <span id="video-page-status"></span>
+                    <button
+                        id="video-next-page"
+                        class="button button--secondary"
+                        type="button"
+                    >
+                        Próxima
+                    </button>
+                </nav>
+            </section>
+        </main>
+
+        <dialog id="video-edit-dialog" class="modal">
+            <form id="video-edit-form" class="modal__content">
+                <div class="modal__heading">
+                    <div>
+                        <span class="modal__eyebrow">Editar vídeo</span>
+                        <h2>Informações da sessão</h2>
+                    </div>
+                    <button
+                        id="video-edit-close"
+                        class="modal__close"
+                        type="button"
+                        aria-label="Fechar"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <label class="field">
+                    <span>Título</span>
+                    <input id="video-edit-title" type="text" required />
+                </label>
+
+                <label class="field">
+                    <span>Categoria</span>
+                    <select id="video-edit-category"></select>
+                </label>
+
+                <div class="modal__actions">
+                    <button
+                        id="video-edit-cancel"
+                        class="button button--secondary"
+                        type="button"
+                    >
+                        Cancelar
+                    </button>
+                    <button class="button" type="submit">
+                        Salvar alterações
+                    </button>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog id="thumbnail-dialog" class="modal">
+            <form id="thumbnail-form" class="modal__content">
+                <div class="modal__heading">
+                    <div>
+                        <span class="modal__eyebrow">Capa do vídeo</span>
+                        <h2>Escolher outro momento</h2>
+                    </div>
+                    <button
+                        id="thumbnail-close"
+                        class="modal__close"
+                        type="button"
+                        aria-label="Fechar"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <p class="muted modal__description">
+                    Informe o ponto do vídeo, em segundos, que será usado como capa.
+                </p>
+
+                <label class="field">
+                    <span>Momento em segundos</span>
+                    <input
+                        id="thumbnail-time"
+                        type="number"
+                        min="0"
+                        step="1"
+                        required
+                    />
+                </label>
+
+                <div class="modal__actions">
+                    <button
+                        id="thumbnail-cancel"
+                        class="button button--secondary"
+                        type="button"
+                    >
+                        Cancelar
+                    </button>
+                    <button class="button" type="submit">
+                        Gerar capa
+                    </button>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog id="history-dialog" class="modal modal--wide">
+            <div class="modal__content">
+                <div class="modal__heading">
+                    <div>
+                        <span class="modal__eyebrow">FFmpeg</span>
+                        <h2 id="history-title">Histórico de processamento</h2>
+                    </div>
+                    <button id="history-close" class="modal__close" type="button" aria-label="Fechar">×</button>
+                </div>
+                <div id="history-list" class="history-list"></div>
+            </div>
+        </dialog>
+
+        <div
+            id="notification"
+            class="notification"
+            role="status"
+            aria-live="polite"
+            hidden
+        ></div>
+    </body>
+</html>
